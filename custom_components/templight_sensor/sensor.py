@@ -39,7 +39,8 @@ async def async_setup_entry(
     _LOGGER.debug("Found the following lights: %s", ", ".join(lights))
 
     for light_id in range(lights):
-        if not (light_entity := registry.async_get(light_id)):
+        light_entity = registry.async_get(light_id)
+        if light_entity is None:
             _LOGGER.error(
                 "Failed to retreive entity for %s, not adding sensor", light_id
             )
@@ -97,7 +98,8 @@ class ColorTemperatureSensor(TempLightSensorBase):
 
     async def async_update(self):
         """Updates the native value with the attribute (brightness)."""
-        if not (base_light_state := self._hass.states.get(self._base_light.entity_id)):
+        base_light_state = self._hass.states.get(self._base_light.entity_id)
+        if base_light_state is None:
             _LOGGER.error(
                 "Failed to get state for %s, no update to %s",
                 self._base_light.entity_id,
@@ -106,7 +108,8 @@ class ColorTemperatureSensor(TempLightSensorBase):
             self._attr_native_value = None
             return
 
-        if not (mireds := base_light_state.attributes[ATTR_COLOR_TEMP]):
+        mireds = base_light_state.attributes.get(ATTR_COLOR_TEMP)
+        if mireds is None:
             _LOGGER.info(
                 "%s does not have attribute %s, no update to %s",
                 self._base_light.entity_id,
@@ -137,7 +140,8 @@ class BrightnessSensor(TempLightSensorBase):
 
     async def async_update(self):
         """Updates the native value with the attribute (brightness)."""
-        if not (base_light_state := self._hass.states.get(self._base_light.entity_id)):
+        base_light_state = self._hass.states.get(self._base_light.entity_id)
+        if base_light_state is None:
             _LOGGER.error(
                 "Failed to get state for %s, no update to %s",
                 self._base_light.entity_id,
@@ -146,7 +150,8 @@ class BrightnessSensor(TempLightSensorBase):
             self._attr_native_value = None
             return
 
-        if not (brightness := base_light_state.attributes[ATTR_BRIGHTNESS]):
+        brightness = base_light_state.attributes.get(ATTR_BRIGHTNESS)
+        if brightness is None:
             _LOGGER.info(
                 "%s does not have attribute %s, no update to %s",
                 self._base_light.entity_id,
