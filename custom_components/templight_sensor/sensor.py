@@ -42,7 +42,7 @@ async def async_setup_entry(
     lights = hass.states.entity_ids("light")
     _LOGGER.debug("Found the following lights: %s", ", ".join(lights))
 
-    for light_id in range(lights):
+    for light_id in lights:
         light_entity = registry.async_get(light_id)
         if light_entity is None:
             _LOGGER.error(
@@ -77,7 +77,7 @@ class TempLightSensorBase(SensorEntity):
 
     async def async_update(self):
         """Updates if the device is enabled."""
-        self._attr_available = not self._base_light.disabled()
+        self._attr_available = not self._base_light.disabled
 
     def read_attribute(self, attribute: str) -> Any:
         """Read the given attribute value from the base light."""
@@ -119,7 +119,7 @@ class ColorTemperatureSensor(TempLightSensorBase):
 
     async def async_update(self):
         """Updates the native value with the attribute (brightness)."""
-        super().async_update()
+        await super().async_update()
 
         mireds = self.read_attribute(ATTR_COLOR_TEMP)
         if mireds is None:
@@ -147,7 +147,7 @@ class BrightnessSensor(TempLightSensorBase):
 
     async def async_update(self):
         """Updates the native value with the attribute (brightness)."""
-        super().async_update()
+        await super().async_update()
 
         brightness = self.read_attribute(ATTR_BRIGHTNESS)
         if brightness is None:
