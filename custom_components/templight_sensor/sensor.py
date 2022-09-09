@@ -1,6 +1,7 @@
 """Platform for sensor integration."""
 
 import logging
+from typing import Any
 
 from homeassistant.const import (
     PERCENTAGE,
@@ -15,7 +16,10 @@ from homeassistant.components.light import (
     ATTR_COLOR_TEMP,
     ATTR_BRIGHTNESS,
 )
-from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.entity import (
+    EntityCategory,
+    DeviceInfo,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
@@ -63,21 +67,38 @@ class TempLightSensorBase(SensorEntity):
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_has_entity_name = True
 
-    # To link this entity to the cover device, this property must return an
-    # identifiers value matching that used in the cover, but no other information such
-    # as name. If name is returned, this entity will then also become a device in the
-    # HA UI.
-    @property
-    def device_info(self):
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._base_light.entity_id)}}
+        # To link this entity to the cover device, this property must return an
+        # identifiers value matching that used in the cover, but no other information such
+        # as name. If name is returned, this entity will then also become a device in the
+        # HA UI.
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, self._base_light.entity_id)}
+        )
 
-    # This property is important to let HA know if this entity is online or not.
-    # If an entity is offline (return False), the UI will refelect this.
-    @property
-    def available(self) -> bool:
-        """Returns if the device is enabled."""
-        return not self._base_light.disabled()
+    async def async_update(self):
+        """Updates if the device is enabled."""
+        self._attr_available = not self._base_light.disabled()
+
+    def read_attribute(self, attribute: str) -> Any:
+        """Read the given attribute value from the base light."""
+        base_light_state = self._hass.states.get(self._base_light.entity_id)
+        if base_light_state is None:
+            _LOGGER.error(
+                "Failed to get state for %s, no update to %s",
+                self._base_light.entity_id,
+                self._attr_unique_id,
+            )
+            return None
+
+        val = base_light_state.attributes.get(attribute)
+        if val is None:
+            _LOGGER.info(
+                "%s does not have attribute %s, no update to %s",
+                self._base_light.entity_id,
+                attribute,
+                self._attr_unique_id,
+            )
+        return val
 
 
 class ColorTemperatureSensor(TempLightSensorBase):
@@ -98,24 +119,10 @@ class ColorTemperatureSensor(TempLightSensorBase):
 
     async def async_update(self):
         """Updates the native value with the attribute (brightness)."""
-        base_light_state = self._hass.states.get(self._base_light.entity_id)
-        if base_light_state is None:
-            _LOGGER.error(
-                "Failed to get state for %s, no update to %s",
-                self._base_light.entity_id,
-                self._attr_unique_id,
-            )
-            self._attr_native_value = None
-            return
+        super().async_update()
 
-        mireds = base_light_state.attributes.get(ATTR_COLOR_TEMP)
+        mireds = self.read_attribute(ATTR_COLOR_TEMP)
         if mireds is None:
-            _LOGGER.info(
-                "%s does not have attribute %s, no update to %s",
-                self._base_light.entity_id,
-                ATTR_COLOR_TEMP,
-                self._attr_unique_id,
-            )
             self._attr_native_value = None
             return
 
@@ -140,24 +147,10 @@ class BrightnessSensor(TempLightSensorBase):
 
     async def async_update(self):
         """Updates the native value with the attribute (brightness)."""
-        base_light_state = self._hass.states.get(self._base_light.entity_id)
-        if base_light_state is None:
-            _LOGGER.error(
-                "Failed to get state for %s, no update to %s",
-                self._base_light.entity_id,
-                self._attr_unique_id,
-            )
-            self._attr_native_value = None
-            return
+        super().async_update()
 
-        brightness = base_light_state.attributes.get(ATTR_BRIGHTNESS)
+        brightness = self.read_attribute(ATTR_BRIGHTNESS)
         if brightness is None:
-            _LOGGER.info(
-                "%s does not have attribute %s, no update to %s",
-                self._base_light.entity_id,
-                ATTR_BRIGHTNESS,
-                self._attr_unique_id,
-            )
             self._attr_native_value = None
             return
 
