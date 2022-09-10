@@ -35,7 +35,7 @@ async def async_setup_entry(
     hass: HomeAssistant,
     _: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
-):
+) -> None:
     """Add sensors for all available lights in HA."""
     new_sensors = []
     registry = entity_registry.async_get(hass)
@@ -58,7 +58,9 @@ async def async_setup_entry(
 class TempLightSensorBase(SensorEntity):
     """Base representation of a TempLight Sensor."""
 
-    def __init__(self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant):
+    def __init__(
+        self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant
+    ) -> None:
         """Initialize the sensor."""
         self._base_light = base_light
         self._hass = hass
@@ -72,10 +74,10 @@ class TempLightSensorBase(SensorEntity):
         # as name. If name is returned, this entity will then also become a device in the
         # HA UI.
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._base_light.entity_id)}
+            identifiers={(DOMAIN, self._base_light.unique_id)}
         )
 
-    async def async_update(self):
+    async def async_update(self) -> None:
         """Updates if the device is enabled."""
         self._attr_available = not self._base_light.disabled
 
@@ -104,20 +106,22 @@ class TempLightSensorBase(SensorEntity):
 class ColorTemperatureSensor(TempLightSensorBase):
     """Sensor that extracts out the color temperature of the given light."""
 
-    def __init__(self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant):
+    def __init__(
+        self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(base_light, hass)
 
         # Entity
         self._attr_name = "Color temperature"
         self._attr_icon = "mdi:brightness-6"
-        self._attr_unique_id = f"{self._base_light.entity_id}_{ColorMode.COLOR_TEMP}"
+        self._attr_unique_id = f"{self._base_light.unique_id}_{ColorMode.COLOR_TEMP}"
 
         # SensorEntity
         self._attr_native_unit_of_measurement = TEMP_KELVIN
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
-    async def async_update(self):
+    async def async_update(self) -> None:
         """Updates the native value with the attribute (brightness)."""
         await super().async_update()
 
@@ -132,20 +136,22 @@ class ColorTemperatureSensor(TempLightSensorBase):
 class BrightnessSensor(TempLightSensorBase):
     """Sensor that extracts out the brightness of the given light."""
 
-    def __init__(self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant):
+    def __init__(
+        self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant
+    ) -> None:
         """Initialize the sensor."""
         super().__init__(base_light, hass)
 
         # Entity
         self._attr_name = "Brightness"
         self._attr_icon = "mdi:temperature-kelvin"
-        self._attr_unique_id = f"{self._base_light.entity_id}_{ColorMode.BRIGHTNESS}"
+        self._attr_unique_id = f"{self._base_light.unique_id}_{ColorMode.BRIGHTNESS}"
 
         # SensorEntity
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
-    async def async_update(self):
+    async def async_update(self) -> None:
         """Updates the native value with the attribute (brightness)."""
         await super().async_update()
 

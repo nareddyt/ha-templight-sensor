@@ -2,3 +2,4 @@
 
 # This is the internal name of the integration.
 DOMAIN = "templight_sensor"
+ENTRY_TITLE: str = "TempLights"
