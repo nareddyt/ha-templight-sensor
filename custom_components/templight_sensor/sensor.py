@@ -37,7 +37,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add sensors for all available lights in HA."""
-    new_sensors = []
+    new_sensors: list[SensorEntity] = []
     registry = entity_registry.async_get(hass)
     lights = hass.states.entity_ids("light")
     _LOGGER.debug("Found the following lights: %s", ", ".join(lights))
