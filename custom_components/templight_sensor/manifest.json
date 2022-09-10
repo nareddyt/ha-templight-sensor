@@ -1,0 +1,10 @@
+{
+    "domain": "templight_sensor",
+    "name": "TempLight Sensor",
+    "version": "1.0.0",
+    "documentation": "https://github.com/nareddyt/ha-templight-sensor",
+    "issue_tracker": "https://github.com/nareddyt/ha-templight-sensor/issues",
+    "codeowners": ["@nareddyt"],
+    "config_flow": true,
+    "iot_class": "calculated"
+  }
