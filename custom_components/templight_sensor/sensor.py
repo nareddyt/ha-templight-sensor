@@ -24,6 +24,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry
+from homeassistant.helpers.typing import (
+    ConfigType,
+    DiscoveryInfoType,
+    HomeAssistantType,
+)
 import homeassistant.util.color as color_util
 
 from .const import DOMAIN
@@ -31,12 +36,11 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-async def async_setup_entry(
+async def async_setup_global(
     hass: HomeAssistant,
-    _: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Add sensors for all available lights in HA."""
+    """Add sensors for ALL available lights in HA."""
     new_sensors: list[SensorEntity] = []
     registry = entity_registry.async_get(hass)
     lights = hass.states.entity_ids("light")
@@ -55,6 +59,25 @@ async def async_setup_entry(
     async_add_entities(new_sensors)
 
 
+async def async_setup_entry(
+    hass: HomeAssistant,
+    _: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Platform setup from config flow."""
+    await async_setup_global(hass, async_add_entities)
+
+
+async def async_setup_platform(
+    hass: HomeAssistantType,
+    _: ConfigType,
+    async_add_entities: AddEntitiesCallback,
+    _: DiscoveryInfoType | None = None,
+) -> None:
+    """Platform setup from configuration.yaml"""
+    await async_setup_global(hass, async_add_entities)
+
+
 class TempLightSensorBase(SensorEntity):
     """Base representation of a TempLight Sensor."""
 
@@ -62,6 +85,7 @@ class TempLightSensorBase(SensorEntity):
         self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant
     ) -> None:
         """Initialize the sensor."""
+        super().__init__()
         self._base_light = base_light
         self._hass = hass
 

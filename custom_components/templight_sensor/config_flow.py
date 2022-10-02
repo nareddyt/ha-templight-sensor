@@ -19,17 +19,22 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
+    _imported_name: str | None = None
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> data_entry_flow.FlowResult:
         """Handle a flow initialized by the user."""
-        if self._async_current_entries():
-            return self.async_abort(reason="single_instance_allowed")
+        await self.async_set_unique_id(DOMAIN)
+        self._abort_if_unique_id_configured()
 
-        if user_input is not None:
-            return self.async_create_entry(title=ENTRY_TITLE, data={})
+        if user_input is None:
+            return self.async_show_form(step_id="user")
 
-        return self.async_show_form(step_id="user")
+        return self.async_create_entry(
+            title=self._imported_name or ENTRY_TITLE,
+            data={},
+        )
 
     async def async_step_import(
         self, user_input: dict[str, Any]

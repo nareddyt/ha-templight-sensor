@@ -6,5 +6,6 @@
     "issue_tracker": "https://github.com/nareddyt/ha-templight-sensor/issues",
     "codeowners": ["@nareddyt"],
     "config_flow": true,
-    "iot_class": "calculated"
+    "iot_class": "calculated",
+    "integration_type": "integration"
   }

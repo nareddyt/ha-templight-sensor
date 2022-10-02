@@ -1,0 +1,14 @@
+{
+  "title": "TempLights",
+  "config": {
+    "step": {
+      "user": {
+        "title": "TempLights",
+        "description": "Do you want to start set up?"
+      }
+    },
+    "abort": {
+      "already_configured": "Already configured. Only a single configuration possible."
+    }
+  }
+}
