@@ -1,4 +1,5 @@
 """Platform for sensor integration."""
+from __future__ import annotations
 
 import logging
 from typing import Any
@@ -43,7 +44,7 @@ async def async_setup_global(
     """Add sensors for ALL available lights in HA."""
     new_sensors: list[SensorEntity] = []
     registry = entity_registry.async_get(hass)
-    lights = hass.states.entity_ids("light")
+    lights = hass.states.async_entity_ids("light")
     _LOGGER.debug("Found the following lights: %s", ", ".join(lights))
 
     for light_id in lights:
@@ -70,9 +71,9 @@ async def async_setup_entry(
 
 async def async_setup_platform(
     hass: HomeAssistantType,
-    _: ConfigType,
+    _config: ConfigType,
     async_add_entities: AddEntitiesCallback,
-    _: DiscoveryInfoType | None = None,
+    _discovery_info: DiscoveryInfoType | None = None,
 ) -> None:
     """Platform setup from configuration.yaml"""
     await async_setup_global(hass, async_add_entities)
