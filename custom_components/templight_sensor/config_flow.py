@@ -3,18 +3,15 @@
 import logging
 from typing import Any
 
-import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant import data_entry_flow
 
 from .const import DOMAIN, ENTRY_TITLE
 
 _LOGGER = logging.getLogger(__name__)
-DATA_SCHEMA = vol.Schema({})
 
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class EmptyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow. Current implementation has no config."""
 
     VERSION = 1
