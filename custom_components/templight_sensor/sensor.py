@@ -24,7 +24,7 @@ from homeassistant.helpers.entity import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import entity_registry
+from homeassistant.helpers import entity_registry, device_registry
 from homeassistant.helpers.typing import (
     ConfigType,
     DiscoveryInfoType,
@@ -43,19 +43,46 @@ async def async_setup_global(
 ) -> None:
     """Add sensors for ALL available lights in HA."""
     new_sensors: list[SensorEntity] = []
-    registry = entity_registry.async_get(hass)
+    e_registry = entity_registry.async_get(hass)
+    d_registry = device_registry.async_get(hass)
     lights = hass.states.async_entity_ids("light")
-    _LOGGER.error("Found the following lights: %s", ", ".join(lights))
+    _LOGGER.debug("Found the following lights: %s", ", ".join(lights))
 
     for light_id in lights:
-        light_entity = registry.async_get(light_id)
+        # Get the entity for the light.
+        light_entity = e_registry.async_get(light_id)
         if light_entity is None:
             _LOGGER.error(
                 "Failed to retreive entity for %s, not adding sensor", light_id
             )
             continue
-        new_sensors.append(ColorTemperatureSensor(base_light=light_entity, hass=hass))
-        new_sensors.append(BrightnessSensor(base_light=light_entity, hass=hass))
+
+        # Get the original device for the entity.
+        light_device = d_registry.async_get(device_id=light_entity.device_id)
+        if light_device is None:
+            _LOGGER.error(
+                "Failed to retreive device for %s, entity id = %s, device id = %s, not adding sensor",
+                light_id,
+                light_entity.entity_id,
+                light_entity.device_id,
+            )
+            continue
+
+        # Create templight sensors.
+        new_sensors.append(
+            ColorTemperatureSensor(
+                base_light_entity=light_entity,
+                base_light_device=light_device,
+                hass=hass,
+            )
+        )
+        new_sensors.append(
+            BrightnessSensor(
+                base_light_entity=light_entity,
+                base_light_device=light_device,
+                hass=hass,
+            )
+        )
 
     async_add_entities(new_sensors)
 
@@ -83,51 +110,54 @@ class TempLightSensorBase(SensorEntity):
     """Base representation of a TempLight Sensor."""
 
     def __init__(
-        self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant
+        self,
+        base_light_entity: entity_registry.RegistryEntry,
+        base_light_device: device_registry.DeviceEntry,
+        hass: HomeAssistant,
     ) -> None:
         """Initialize the sensor."""
         super().__init__()
-        self._base_light = base_light
+        self._base_light_entity = base_light_entity
+        self._base_light_device = base_light_device
         self._hass = hass
 
         # Entity
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_has_entity_name = True
 
+        # Link this new entity to the original device.
+        identifiers: set[tuple[str, str]] = [
+            (DOMAIN, self._base_light_entity.unique_id),
+        ] + self._base_light_device.identifiers
+
         self._attr_device_info = DeviceInfo(
             # To link this entity to the cover device, this property must return an
             # identifiers value matching that used in the cover, but no other information such
             # as name. If name is returned, this entity will then also become a device in the
             # HA UI.
-            identifiers={
-                (DOMAIN, self._base_light.unique_id),
-                (self._base_light.domain, self._base_light.unique_id),
-            }
-        )
-        _LOGGER.error(
-            "created templight base with device info: %s", self._attr_device_info
+            identifiers=identifiers
         )
 
     async def async_update(self) -> None:
         """Updates if the device is enabled."""
-        self._attr_available = not self._base_light.disabled
+        self._attr_available = not self._base_light_entity.disabled
 
     def read_attribute(self, attribute: str) -> Any:
         """Read the given attribute value from the base light."""
-        base_light_state = self._hass.states.get(self._base_light.entity_id)
+        base_light_state = self._hass.states.get(self._base_light_entity.entity_id)
         if base_light_state is None:
             _LOGGER.error(
                 "Failed to get state for %s, no update to %s",
-                self._base_light.entity_id,
+                self._base_light_entity.entity_id,
                 self._attr_unique_id,
             )
             return None
 
         val = base_light_state.attributes.get(attribute)
         if val is None:
-            _LOGGER.error(
+            _LOGGER.info(
                 "%s does not have attribute %s, no update to %s",
-                self._base_light.entity_id,
+                self._base_light_entity.entity_id,
                 attribute,
                 self._attr_unique_id,
             )
@@ -138,15 +168,20 @@ class ColorTemperatureSensor(TempLightSensorBase):
     """Sensor that extracts out the color temperature of the given light."""
 
     def __init__(
-        self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant
+        self,
+        base_light_entity: entity_registry.RegistryEntry,
+        base_light_device: device_registry.DeviceEntry,
+        hass: HomeAssistant,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(base_light, hass)
+        super().__init__(base_light_entity, base_light_device, hass)
 
         # Entity
         self._attr_name = "Color temperature"
         self._attr_icon = "mdi:temperature-kelvin"
-        self._attr_unique_id = f"{self._base_light.unique_id}_{ColorMode.COLOR_TEMP}"
+        self._attr_unique_id = (
+            f"{self._base_light_entity.unique_id}_{ColorMode.COLOR_TEMP}"
+        )
 
         # SensorEntity
         self._attr_native_unit_of_measurement = TEMP_KELVIN
@@ -168,15 +203,20 @@ class BrightnessSensor(TempLightSensorBase):
     """Sensor that extracts out the brightness percentage of the given light."""
 
     def __init__(
-        self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant
+        self,
+        base_light_entity: entity_registry.RegistryEntry,
+        base_light_device: device_registry.DeviceEntry,
+        hass: HomeAssistant,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(base_light, hass)
+        super().__init__(base_light_entity, base_light_device, hass)
 
         # Entity
         self._attr_name = "Brightness"
         self._attr_icon = "mdi:brightness-6"
-        self._attr_unique_id = f"{self._base_light.unique_id}_{ColorMode.BRIGHTNESS}"
+        self._attr_unique_id = (
+            f"{self._base_light_entity.unique_id}_{ColorMode.BRIGHTNESS}"
+        )
 
         # SensorEntity
         self._attr_native_unit_of_measurement = PERCENTAGE
