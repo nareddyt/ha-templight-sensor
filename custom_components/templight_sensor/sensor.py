@@ -145,7 +145,7 @@ class ColorTemperatureSensor(TempLightSensorBase):
 
         # Entity
         self._attr_name = "Color temperature"
-        self._attr_icon = "mdi:brightness-6"
+        self._attr_icon = "mdi:temperature-kelvin"
         self._attr_unique_id = f"{self._base_light.unique_id}_{ColorMode.COLOR_TEMP}"
 
         # SensorEntity
@@ -165,7 +165,7 @@ class ColorTemperatureSensor(TempLightSensorBase):
 
 
 class BrightnessSensor(TempLightSensorBase):
-    """Sensor that extracts out the brightness of the given light."""
+    """Sensor that extracts out the brightness percentage of the given light."""
 
     def __init__(
         self, base_light: entity_registry.RegistryEntry, hass: HomeAssistant
@@ -175,7 +175,7 @@ class BrightnessSensor(TempLightSensorBase):
 
         # Entity
         self._attr_name = "Brightness"
-        self._attr_icon = "mdi:temperature-kelvin"
+        self._attr_icon = "mdi:brightness-6"
         self._attr_unique_id = f"{self._base_light.unique_id}_{ColorMode.BRIGHTNESS}"
 
         # SensorEntity
@@ -191,4 +191,5 @@ class BrightnessSensor(TempLightSensorBase):
             self._attr_native_value = None
             return
 
-        self._attr_native_value = round(brightness / 100 * 255)
+        # 0 - 255 -> percentage
+        self._attr_native_value = (brightness / 255) * 100
