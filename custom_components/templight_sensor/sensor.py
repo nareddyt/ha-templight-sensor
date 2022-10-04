@@ -45,7 +45,7 @@ async def async_setup_global(
     new_sensors: list[SensorEntity] = []
     registry = entity_registry.async_get(hass)
     lights = hass.states.async_entity_ids("light")
-    _LOGGER.debug("Found the following lights: %s", ", ".join(lights))
+    _LOGGER.error("Found the following lights: %s", ", ".join(lights))
 
     for light_id in lights:
         light_entity = registry.async_get(light_id)
@@ -94,12 +94,18 @@ class TempLightSensorBase(SensorEntity):
         self._attr_entity_category = EntityCategory.DIAGNOSTIC
         self._attr_has_entity_name = True
 
-        # To link this entity to the cover device, this property must return an
-        # identifiers value matching that used in the cover, but no other information such
-        # as name. If name is returned, this entity will then also become a device in the
-        # HA UI.
         self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._base_light.unique_id)}
+            # To link this entity to the cover device, this property must return an
+            # identifiers value matching that used in the cover, but no other information such
+            # as name. If name is returned, this entity will then also become a device in the
+            # HA UI.
+            identifiers={
+                (DOMAIN, self._base_light.unique_id),
+                (self._base_light.domain, self._base_light.unique_id),
+            }
+        )
+        _LOGGER.error(
+            "created templight base with device info: %s", self._attr_device_info
         )
 
     async def async_update(self) -> None:
@@ -119,7 +125,7 @@ class TempLightSensorBase(SensorEntity):
 
         val = base_light_state.attributes.get(attribute)
         if val is None:
-            _LOGGER.info(
+            _LOGGER.error(
                 "%s does not have attribute %s, no update to %s",
                 self._base_light.entity_id,
                 attribute,
