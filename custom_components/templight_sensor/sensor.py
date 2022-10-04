@@ -126,9 +126,9 @@ class TempLightSensorBase(SensorEntity):
         self._attr_has_entity_name = True
 
         # Link this new entity to the original device.
-        identifiers: set[tuple[str, str]] = [
+        identifiers: set[tuple[str, str]] = {
             (DOMAIN, self._base_light_entity.unique_id),
-        ] + self._base_light_device.identifiers
+        }.union(self._base_light_device.identifiers)
 
         self._attr_device_info = DeviceInfo(
             # To link this entity to the cover device, this property must return an
