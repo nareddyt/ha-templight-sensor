@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Callable
 
 from homeassistant.const import (
     PERCENTAGE,
@@ -23,13 +23,9 @@ from homeassistant.helpers.entity import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, Event, callback
 from homeassistant.helpers import entity_registry, device_registry
-from homeassistant.helpers.typing import (
-    ConfigType,
-    DiscoveryInfoType,
-    HomeAssistantType,
-)
+from homeassistant.helpers.event import async_track_state_change_event
 import homeassistant.util.color as color_util
 
 from .const import DOMAIN
@@ -97,25 +93,17 @@ async def async_setup_entry(
     """Platform setup from config flow."""
     await async_setup_global(hass, async_add_entities)
 
-
-async def async_setup_platform(
-    hass: HomeAssistantType,
-    _config: ConfigType,
-    async_add_entities: AddEntitiesCallback,
-    _discovery_info: DiscoveryInfoType | None = None,
-) -> None:
-    """Platform setup from configuration.yaml"""
-    await async_setup_global(hass, async_add_entities)
-
-
 class TempLightSensorBase(SensorEntity):
     """Base representation of a TempLight Sensor."""
+
+    async_push_update: Callable[[], None]
 
     def __init__(
         self,
         base_light_entity: entity_registry.RegistryEntry,
         base_light_device: device_registry.DeviceEntry,
         hass: HomeAssistant,
+        async_push_update: Callable[[], None],
     ) -> None:
         """Initialize the sensor."""
         super().__init__()
@@ -144,6 +132,25 @@ class TempLightSensorBase(SensorEntity):
             identifiers,
         )
 
+        # Push instead of poll for state updates from base light.
+        self._attr_should_poll = False
+        self.async_push_update = async_push_update
+        async_track_state_change_event(
+            self._hass,
+            self._base_light_entity.entity_id,
+            self.async_on_base_light_change
+        )
+
+    @callback
+    async def async_on_base_light_change(self, _: Event) -> None:
+        """Called whenever the base light state is updated."""
+        _LOGGER.debug(
+            "base light %s state change detected by %s",
+            self._base_light_entity.entity_id,
+            self.entity_id,
+        )
+        await self.async_push_update()
+
     async def async_update(self) -> None:
         """Updates if the device is enabled."""
         self._attr_available = not self._base_light_entity.disabled
@@ -161,7 +168,7 @@ class TempLightSensorBase(SensorEntity):
 
         val = base_light_state.attributes.get(attribute)
         if val is None:
-            _LOGGER.info(
+            _LOGGER.debug(
                 "%s does not have attribute %s, no update to %s",
                 self._base_light_entity.entity_id,
                 attribute,
@@ -180,7 +187,7 @@ class ColorTemperatureSensor(TempLightSensorBase):
         hass: HomeAssistant,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(base_light_entity, base_light_device, hass)
+        super().__init__(base_light_entity, base_light_device, hass, self.async_update)
 
         # Entity
         self._attr_name = "Color temperature"
@@ -196,6 +203,7 @@ class ColorTemperatureSensor(TempLightSensorBase):
         self._attr_native_unit_of_measurement = TEMP_KELVIN
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
+    @callback
     async def async_update(self) -> None:
         """Updates the native value with the attribute (color temp)."""
         _LOGGER.debug(
@@ -210,6 +218,7 @@ class ColorTemperatureSensor(TempLightSensorBase):
             return
 
         self._attr_native_value = color_util.color_temperature_kelvin_to_mired(mireds)
+        await self.async_write_ha_state()
 
 
 class BrightnessSensor(TempLightSensorBase):
@@ -222,7 +231,7 @@ class BrightnessSensor(TempLightSensorBase):
         hass: HomeAssistant,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(base_light_entity, base_light_device, hass)
+        super().__init__(base_light_entity, base_light_device, hass, self.async_update)
 
         # Entity
         self._attr_name = "Brightness"
@@ -238,13 +247,14 @@ class BrightnessSensor(TempLightSensorBase):
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
+    @callback
     async def async_update(self) -> None:
         """Updates the native value with the attribute (brightness)."""
         _LOGGER.debug(
             "updating brightness for %s",
             self.entity_id,
         )
-        await super().async_update()
+        super().async_update()
 
         brightness = self.read_attribute(ATTR_BRIGHTNESS)
         if brightness is None:
@@ -253,3 +263,4 @@ class BrightnessSensor(TempLightSensorBase):
 
         # 0 - 255 -> percentage rounded to whole number
         self._attr_native_value = round((brightness / 255) * 100)
+        self.async_write_ha_state()
