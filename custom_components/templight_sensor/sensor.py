@@ -42,6 +42,8 @@ async def async_setup_global(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Add sensors for ALL available lights in HA."""
+    _LOGGER.info("loading templights component")
+
     new_sensors: list[SensorEntity] = []
     e_registry = entity_registry.async_get(hass)
     d_registry = device_registry.async_get(hass)
@@ -129,13 +131,17 @@ class TempLightSensorBase(SensorEntity):
         identifiers: set[tuple[str, str]] = {
             (DOMAIN, self._base_light_entity.unique_id),
         }.union(self._base_light_device.identifiers)
-
         self._attr_device_info = DeviceInfo(
             # To link this entity to the cover device, this property must return an
             # identifiers value matching that used in the cover, but no other information such
             # as name. If name is returned, this entity will then also become a device in the
             # HA UI.
             identifiers=identifiers
+        )
+        _LOGGER.debug(
+            "identifiers added to reference base light %s: %s",
+            self._base_light_entity.entity_id,
+            identifiers,
         )
 
     async def async_update(self) -> None:
@@ -146,10 +152,10 @@ class TempLightSensorBase(SensorEntity):
         """Read the given attribute value from the base light."""
         base_light_state = self._hass.states.get(self._base_light_entity.entity_id)
         if base_light_state is None:
-            _LOGGER.error(
+            _LOGGER.warning(
                 "Failed to get state for %s, no update to %s",
                 self._base_light_entity.entity_id,
-                self._attr_unique_id,
+                self.entity_id,
             )
             return None
 
@@ -159,7 +165,7 @@ class TempLightSensorBase(SensorEntity):
                 "%s does not have attribute %s, no update to %s",
                 self._base_light_entity.entity_id,
                 attribute,
-                self._attr_unique_id,
+                self.entity_id,
             )
         return val
 
@@ -182,13 +188,20 @@ class ColorTemperatureSensor(TempLightSensorBase):
         self._attr_unique_id = (
             f"{self._base_light_entity.unique_id}_{ColorMode.COLOR_TEMP}"
         )
+        self.entity_id = (
+            f"{self._base_light_entity.entity_id}_{ColorMode.COLOR_TEMP}"
+        )
 
         # SensorEntity
         self._attr_native_unit_of_measurement = TEMP_KELVIN
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
     async def async_update(self) -> None:
-        """Updates the native value with the attribute (brightness)."""
+        """Updates the native value with the attribute (color temp)."""
+        _LOGGER.debug(
+            "updating color temp for %s",
+            self.entity_id,
+        )
         await super().async_update()
 
         mireds = self.read_attribute(ATTR_COLOR_TEMP)
@@ -217,6 +230,9 @@ class BrightnessSensor(TempLightSensorBase):
         self._attr_unique_id = (
             f"{self._base_light_entity.unique_id}_{ColorMode.BRIGHTNESS}"
         )
+        self.entity_id = (
+            f"{self._base_light_entity.entity_id}_{ColorMode.BRIGHTNESS}"
+        )
 
         # SensorEntity
         self._attr_native_unit_of_measurement = PERCENTAGE
@@ -224,6 +240,10 @@ class BrightnessSensor(TempLightSensorBase):
 
     async def async_update(self) -> None:
         """Updates the native value with the attribute (brightness)."""
+        _LOGGER.debug(
+            "updating brightness for %s",
+            self.entity_id,
+        )
         await super().async_update()
 
         brightness = self.read_attribute(ATTR_BRIGHTNESS)
@@ -231,5 +251,5 @@ class BrightnessSensor(TempLightSensorBase):
             self._attr_native_value = None
             return
 
-        # 0 - 255 -> percentage
-        self._attr_native_value = (brightness / 255) * 100
+        # 0 - 255 -> percentage rounded to whole number
+        self._attr_native_value = round((brightness / 255) * 100)
