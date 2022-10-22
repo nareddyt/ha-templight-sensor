@@ -254,7 +254,7 @@ class BrightnessSensor(TempLightSensorBase):
             "updating brightness for %s",
             self.entity_id,
         )
-        super().async_update()
+        await super().async_update()
 
         brightness = self.read_attribute(ATTR_BRIGHTNESS)
         if brightness is None:
