@@ -16,6 +16,7 @@ from homeassistant.components.light import (
     ColorMode,
     ATTR_COLOR_TEMP,
     ATTR_BRIGHTNESS,
+    DOMAIN as LIGHT_DOMAIN,
 )
 from homeassistant.helpers.entity import (
     EntityCategory,
@@ -23,28 +24,61 @@ from homeassistant.helpers.entity import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.core import HomeAssistant, Event, callback
+from homeassistant.core import HomeAssistant, Event, callback, CALLBACK_TYPE
 from homeassistant.helpers import entity_registry, device_registry
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_track_state_change_event, async_track_state_added_domain
 import homeassistant.util.color as color_util
 
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-
-async def async_setup_global(
+async def async_setup_entry(
     hass: HomeAssistant,
+    _: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Add sensors for ALL available lights in HA."""
+    """
+    Platform setup from config flow.
+    """
     _LOGGER.info("loading templights component")
+    
+    # Add sensors for ALL currently available lights in HA.
+    lights = hass.states.async_entity_ids(LIGHT_DOMAIN)
+    _LOGGER.debug("detected lights on startup: %s", ", ".join(lights))
+    await create_templights(lights, hass, async_add_entities)
 
+    # Listen for new lights added later.
+    @callback
+    async def on_light_added(event: Event) -> None:
+        """
+        Translates new entity id callback to function to create templights.
+        """
+        light_id: Any = event.data["entity_id"]
+        _LOGGER.debug("detected new light %s", light_id)
+
+        if not isinstance(light_id, str):
+            _LOGGER.error("on_light_added got non-string entity id %s", light_id)
+            return
+
+        await create_templights(
+            lights=[str(light_id)],
+            hass=hass,
+            async_add_entities=async_add_entities,
+        )
+    async_track_state_added_domain(hass, LIGHT_DOMAIN, on_light_added)
+
+async def create_templights(
+    lights: list[str],
+    hass: HomeAssistant,
+    async_add_entities: AddEntitiesCallback
+) -> None:
+    """
+    Create TempLight entities for each light in the list.
+    """
     new_sensors: list[SensorEntity] = []
     e_registry = entity_registry.async_get(hass)
     d_registry = device_registry.async_get(hass)
-    lights = hass.states.async_entity_ids("light")
-    _LOGGER.debug("Found the following lights: %s", ", ".join(lights))
 
     for light_id in lights:
         # Get the entity for the light.
@@ -84,19 +118,11 @@ async def async_setup_global(
 
     async_add_entities(new_sensors)
 
-
-async def async_setup_entry(
-    hass: HomeAssistant,
-    _: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
-) -> None:
-    """Platform setup from config flow."""
-    await async_setup_global(hass, async_add_entities)
-
 class TempLightSensorBase(SensorEntity):
     """Base representation of a TempLight Sensor."""
 
     async_push_update: Callable[[], None]
+    _unsub: CALLBACK_TYPE
 
     def __init__(
         self,
@@ -135,11 +161,17 @@ class TempLightSensorBase(SensorEntity):
         # Push instead of poll for state updates from base light.
         self._attr_should_poll = False
         self.async_push_update = async_push_update
-        async_track_state_change_event(
+        self._unsub = async_track_state_change_event(
             self._hass,
             self._base_light_entity.entity_id,
             self.async_on_base_light_change
         )
+    
+    async def cleanup(self) -> None:
+        """Stop watching state changes to base light."""
+        if self._unsub:
+            self._unsub()
+            self._unsub = None
 
     @callback
     async def async_on_base_light_change(self, _: Event) -> None:
