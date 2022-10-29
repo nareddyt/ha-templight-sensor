@@ -250,7 +250,7 @@ class ColorTemperatureSensor(TempLightSensorBase):
             return
 
         self._attr_native_value = color_util.color_temperature_kelvin_to_mired(mireds)
-        await self.async_write_ha_state()
+        self.async_write_ha_state()
 
 
 class BrightnessSensor(TempLightSensorBase):
