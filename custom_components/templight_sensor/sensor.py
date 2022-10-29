@@ -235,6 +235,10 @@ class ColorTemperatureSensor(TempLightSensorBase):
         self._attr_native_unit_of_measurement = TEMP_KELVIN
         self._attr_state_class = SensorStateClass.MEASUREMENT
 
+        # Force update on setup.
+        self.hass = hass
+        hass.add_job(self.async_update)
+
     @callback
     async def async_update(self) -> None:
         """Updates the native value with the attribute (color temp)."""
@@ -278,6 +282,10 @@ class BrightnessSensor(TempLightSensorBase):
         # SensorEntity
         self._attr_native_unit_of_measurement = PERCENTAGE
         self._attr_state_class = SensorStateClass.MEASUREMENT
+
+        # Force update on setup.
+        self.hass = hass
+        hass.add_job(self.async_update)
 
     @callback
     async def async_update(self) -> None:
