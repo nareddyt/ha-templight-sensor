@@ -375,7 +375,7 @@ class ColorHueSensor(TempLightSensorBase):
             return
 
         # Extract out first part as hue
-        self._attr_native_value = hs_color[0]
+        self._attr_native_value = round(hs_color[0])
         self.async_write_ha_state()
 
 class ColorSaturationSensor(TempLightSensorBase):
