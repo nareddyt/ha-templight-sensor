@@ -7,6 +7,7 @@ from typing import Any, Callable
 from homeassistant.const import (
     PERCENTAGE,
     TEMP_KELVIN,
+    DEGREE,
 )
 from homeassistant.components.sensor import (
     SensorEntity,
@@ -14,8 +15,9 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.components.light import (
     ColorMode,
-    ATTR_COLOR_TEMP,
+    ATTR_COLOR_TEMP_KELVIN,
     ATTR_BRIGHTNESS,
+    ATTR_HS_COLOR,
     DOMAIN as LIGHT_DOMAIN,
 )
 from homeassistant.helpers.entity import (
@@ -27,7 +29,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.core import HomeAssistant, Event, callback, CALLBACK_TYPE
 from homeassistant.helpers import entity_registry, device_registry
 from homeassistant.helpers.event import async_track_state_change_event, async_track_state_added_domain
-import homeassistant.util.color as color_util
 
 from .const import DOMAIN
 
@@ -110,6 +111,20 @@ async def create_templights(
         )
         new_sensors.append(
             BrightnessSensor(
+                base_light_entity=light_entity,
+                base_light_device=light_device,
+                hass=hass,
+            )
+        )
+        new_sensors.append(
+            ColorHueSensor(
+                base_light_entity=light_entity,
+                base_light_device=light_device,
+                hass=hass,
+            )
+        )
+        new_sensors.append(
+            ColorSaturationSensor(
                 base_light_entity=light_entity,
                 base_light_device=light_device,
                 hass=hass,
@@ -248,12 +263,12 @@ class ColorTemperatureSensor(TempLightSensorBase):
         )
         await super().async_update()
 
-        mireds = self.read_attribute(ATTR_COLOR_TEMP)
-        if mireds is None:
+        kelvin: int | None = self.read_attribute(ATTR_COLOR_TEMP_KELVIN)
+        if kelvin is None:
             self._attr_native_value = None
             return
 
-        self._attr_native_value = color_util.color_temperature_kelvin_to_mired(mireds)
+        self._attr_native_value = kelvin
         self.async_write_ha_state()
 
 
@@ -296,11 +311,127 @@ class BrightnessSensor(TempLightSensorBase):
         )
         await super().async_update()
 
-        brightness = self.read_attribute(ATTR_BRIGHTNESS)
+        brightness: int | None = self.read_attribute(ATTR_BRIGHTNESS)
         if brightness is None:
             self._attr_native_value = None
             return
 
         # 0 - 255 -> percentage rounded to whole number
         self._attr_native_value = round((brightness / 255) * 100)
+        self.async_write_ha_state()
+
+class ColorHueSensor(TempLightSensorBase):
+    """Sensor that extracts out the color hue of the given light."""
+
+    def __init__(
+        self,
+        base_light_entity: entity_registry.RegistryEntry,
+        base_light_device: device_registry.DeviceEntry,
+        hass: HomeAssistant,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(base_light_entity, base_light_device, hass, self.async_update)
+
+        # Entity
+        self._attr_name = "Hue"
+        self._attr_icon = "mdi:palette"
+        self._attr_unique_id = (
+            f"{self._base_light_entity.unique_id}_{ColorMode.HS}_hue"
+        )
+        self.entity_id = (
+            f"{self._base_light_entity.entity_id}_{ColorMode.HS}_hue"
+        )
+
+        # SensorEntity
+        self._attr_native_unit_of_measurement = DEGREE
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+
+        # Force update on setup.
+        self.hass = hass
+        hass.add_job(self.async_update)
+
+    @callback
+    async def async_update(self) -> None:
+        """Updates the native value with the attribute (hs)."""
+        _LOGGER.debug(
+            "updating hue for %s",
+            self.entity_id,
+        )
+        await super().async_update()
+
+        hs_color: tuple | None = self.read_attribute(ATTR_HS_COLOR)
+        if hs_color is None:
+            self._attr_native_value = None
+            return
+
+        if len(hs_color) != 2:
+            _LOGGER.warning(
+                "State for %s is unexpected hs_color %s, no update to %s",
+                self._base_light_entity.entity_id,
+                hs_color,
+                self.entity_id,
+            )
+            self._attr_native_value = None
+            return
+
+        # Extract out first part as hue
+        self._attr_native_value = hs_color[0]
+        self.async_write_ha_state()
+
+class ColorSaturationSensor(TempLightSensorBase):
+    """Sensor that extracts out the color saturation of the given light."""
+
+    def __init__(
+        self,
+        base_light_entity: entity_registry.RegistryEntry,
+        base_light_device: device_registry.DeviceEntry,
+        hass: HomeAssistant,
+    ) -> None:
+        """Initialize the sensor."""
+        super().__init__(base_light_entity, base_light_device, hass, self.async_update)
+
+        # Entity
+        self._attr_name = "Saturation"
+        self._attr_icon = "mdi:invert-colors"
+        self._attr_unique_id = (
+            f"{self._base_light_entity.unique_id}_{ColorMode.HS}_saturation"
+        )
+        self.entity_id = (
+            f"{self._base_light_entity.entity_id}_{ColorMode.HS}_saturation"
+        )
+
+        # SensorEntity
+        self._attr_native_unit_of_measurement = PERCENTAGE
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+
+        # Force update on setup.
+        self.hass = hass
+        hass.add_job(self.async_update)
+
+    @callback
+    async def async_update(self) -> None:
+        """Updates the native value with the attribute (hs)."""
+        _LOGGER.debug(
+            "updating hue for %s",
+            self.entity_id,
+        )
+        await super().async_update()
+
+        hs_color: tuple | None = self.read_attribute(ATTR_HS_COLOR)
+        if hs_color is None:
+            self._attr_native_value = None
+            return
+
+        if len(hs_color) != 2:
+            _LOGGER.warning(
+                "State for %s is unexpected hs_color %s, no update to %s",
+                self._base_light_entity.entity_id,
+                hs_color,
+                self.entity_id,
+            )
+            self._attr_native_value = None
+            return
+
+        # Extract out first part as saturation
+        self._attr_native_value = round(hs_color[1])
         self.async_write_ha_state()
