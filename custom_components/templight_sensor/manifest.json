@@ -1,7 +1,7 @@
 {
   "domain": "templight_sensor",
   "name": "TempLight Sensor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "documentation": "https://github.com/nareddyt/ha-templight-sensor",
   "issue_tracker": "https://github.com/nareddyt/ha-templight-sensor/issues",
   "codeowners": ["@nareddyt"],

@@ -11,12 +11,14 @@ _Home Assistant custom integration to extract out light attributes (color temp, 
   - [Installing](#installing)
   - [Configuration](#configuration)
   - [Benefits](#benefits)
+    - [No More Custom Template Sensors](#no-more-custom-template-sensors)
     - [Save Attribute History](#save-attribute-history)
     - [Easier Automations & Frontend Views](#easier-automations--frontend-views)
-    - [No More Custom Template Sensors](#no-more-custom-template-sensors)
   - [Supported Attributes](#supported-attributes)
   - [Supported Entities](#supported-entities)
-  - [Naming](#naming)
+  - [FAQ](#faq)
+    - [Naming](#naming)
+    - [Read Only](#read-only)
 
 ## Overview
 
@@ -40,6 +42,10 @@ There is no configuration! TempLight Sensors are automatically added for all _su
 
 A few reasons these diagonstic sensors are useful:
 
+### No More Custom Template Sensors
+
+You don't need to create your own template sensors to just extract out an attribute as state! It essentially occurs automatically now for any light you add.
+
 ### Save Attribute History
 
 By default, Home Assistant does not save your lights' attributes in the database. You cannot query Home Assistant for the previous attribute values - e.g. _"How bright was my night light yesterday at 8am?"_
@@ -56,22 +62,20 @@ With TempLight Sensors, you can easily use these attributes, as they are now nat
 
 ![Shows the entity frontend card config to view TempLight Sensor's state (light's color_temp attribute)](img/using-state-frontent.png "Using State in the Frontend")
 
-### No More Custom Template Sensors
-
-You don't need to create your own template sensors to just extract out an attribute as state! It essentially occurs automatically now for any light you add.
-
 ## Supported Attributes
 
 The following light attributes are extracted and stored as individual TempLight Sensors:
 
-- `brightness`
-- `color_temp`
+- Brightness (%) via the `brightness` attribute
+- Color temperature (Kelvin) via the `color_temp` attribute
+- Color hue via the `hs_color` attribute
+- Color saturation via the `hs_color` attribute
 
 Please file a feature request if would like to see other light attributes as sensors.
 
-If the underying light does not support an attribute above (e.g. you have an RGB light that does not have color temperature), the sensor will still be created but show up as `Unavailable`.
+If the underying light does not support an attribute above (e.g. you have an RGB light that does not have color temperature), the sensor will still be created but show up as `Unknown`.
 
-If the light is turned off, all TempLight Sensors will show the last available value. They will **not** show as `Disabled` or `Unavailable`.
+If the light is turned off, all TempLight Sensors will show the last available value. They will **not** show as `Disabled`, `Unavailable`, or `Unknown`.
 
 ## Supported Entities
 
@@ -81,10 +85,17 @@ TempLight Sensors are automatically created for the following entities:
 
 Please file a feature request if would like to see other supported entities.
 
-## Naming
+## FAQ
+
+### Naming
 
 Why is this integration called **TempLight Sensor**?
 
 It is a bit historical: To track attributes as state in Home Assistant, the common advice in the HA community forums is to create a new `template_sensor` that extracts that attribute into another sensor.
 
 But also a play on words: Originally this integration was created to track `light` attributes. Hence `template_sensor` --> `templight_sensor`.
+
+### Read Only
+
+TempLight Sensors are diagnostic sensors.
+They only output the underlying value. They do not support overwriting the value in the underlying entity.
